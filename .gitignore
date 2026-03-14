@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+
+# data files — raw CSVs and archives are never committed
+backend/data/raw/
+backend/data/*.zip
+backend/data/*.pdf
+backend/data/*.csv
+*.sql.gz
+*.dump
+backups/

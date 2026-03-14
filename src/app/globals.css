@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: var(--font-lora);
+  --font-body: var(--font-inter);
+  --color-brand-dark: #0f1923;
+  --color-brand-text: #f5f0e8;
+  --color-brand-muted: #8b9aaa;
+}
+
+:root {
+  --background: #0f1923;
+  --foreground: #f5f0e8;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
