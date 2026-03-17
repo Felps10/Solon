@@ -1,9 +1,11 @@
 import uuid
+from datetime import datetime
 from sqlalchemy import (
     Column, String, Date, Text,
-    DateTime, Boolean, ForeignKey, Integer
+    DateTime, Boolean, ForeignKey, Integer, UniqueConstraint, Index
 )
 from sqlalchemy.dialects.postgresql import UUID, TSTZRANGE
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -20,11 +22,57 @@ class Person(Base):
     gender = Column(String(20), nullable=True)
     bio_summary = Column(Text, nullable=True)
     cpdoc_id = Column(String(100), nullable=True, unique=True)
-    tse_id = Column(String(100), nullable=True, unique=True)
     created_at = Column(DateTime(timezone=True),
                         server_default=func.now())
     updated_at = Column(DateTime(timezone=True),
                         onupdate=func.now())
+
+    external_ids: Mapped[list["PersonExternalId"]] = relationship(
+        "PersonExternalId", back_populates="person",
+        cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_people_name_birthdate",
+            func.immutable_unaccent(Column("canonical_name", String)),
+            Column("birth_date", Date),
+            unique=True,
+            postgresql_where=Column("birth_date", Date).isnot(None),
+        ),
+    )
+
+
+class PersonExternalId(Base):
+    __tablename__ = "people_external_ids"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("people.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )
+    external_id: Mapped[str] = mapped_column(
+        String(200), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("source", "external_id",
+            name="uq_people_external_ids_source_external_id"),
+    )
+
+    person: Mapped["Person"] = relationship(
+        "Person", back_populates="external_ids"
+    )
 
 
 class PartyAffiliation(Base):

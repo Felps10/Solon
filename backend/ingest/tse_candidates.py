@@ -7,7 +7,9 @@ into memoria_politica. Every inserted row is traceable to its source file.
 Natural keys used for deduplication (no schema changes required):
   - Party:      abbreviation (SG_PARTIDO)
   - Election:   tse_election_id = "{CD_ELEICAO}_{NR_TURNO}"
-  - Person:     canonical_name (normalised NM_CANDIDATO)
+  - Person:     canonical_name + birth_date (normalised NM_CANDIDATO + DT_NASCIMENTO)
+                Falls back to name-only match when birth_date is None —
+                some historical records have no birth date in the TSE source.
   - Candidacy:  source_label = "TSE/consulta_cand_{YEAR}/{SQ_CANDIDATO}"
 
 Note: NR_VOTOS is not present in consulta_cand files — vote counts live
@@ -16,6 +18,9 @@ in a separate TSE results dataset and are left NULL here.
 # DEDUPLICATION POLICY:
 # Person lookup uses unaccent() normalisation to prevent
 # accent-encoding duplicates across TSE election years.
+# The primary dedup key is (immutable_unaccent(canonical_name), birth_date).
+# When birth_date is None, the lookup falls back to name-only — this is
+# a weaker match and a WARNING is logged to flag the ambiguity.
 # When a match is found, the existing record is reused
 # and the name is NOT updated — the first ingested form
 # is treated as canonical until manually reviewed.
@@ -214,26 +219,50 @@ def get_or_create_person(cur, cache: dict, nm_candidato: str,
     norm = normalize_name(nm_candidato)
     if not norm:
         return None
-    if norm in cache:
-        return cache[norm]
-    # Use unaccent() normalisation so accent-encoding variants from different
-    # election years resolve to the same person record. The first ingested name
-    # form is kept as canonical; it is NOT overwritten on subsequent matches.
-    cur.execute(
-        "SELECT id FROM people WHERE public.immutable_unaccent(canonical_name) = public.immutable_unaccent(%(name)s) LIMIT 1",
-        {"name": norm},
-    )
+
+    # Cache key is (name, birth_date) — two people with the same name but
+    # different birth dates are distinct records.
+    cache_key = (norm, birth_date)
+    if cache_key in cache:
+        return cache[cache_key]
+
+    if birth_date is not None:
+        # Primary path: match on both normalised name AND birth date.
+        cur.execute(
+            "SELECT id FROM people "
+            "WHERE public.immutable_unaccent(canonical_name) = public.immutable_unaccent(%(name)s) "
+            "AND birth_date = %(birth_date)s "
+            "LIMIT 1",
+            {"name": norm, "birth_date": birth_date},
+        )
+    else:
+        # Fallback: birth_date unknown — match on name only.
+        # This is a weaker match; log a warning so it can be reviewed.
+        log.warning(
+            "get_or_create_person: birth_date is None for %r — "
+            "falling back to name-only match (ambiguous)",
+            norm,
+        )
+        cur.execute(
+            "SELECT id FROM people "
+            "WHERE public.immutable_unaccent(canonical_name) = public.immutable_unaccent(%(name)s) "
+            "AND birth_date IS NULL "
+            "LIMIT 1",
+            {"name": norm},
+        )
+
     row = cur.fetchone()
     if row:
-        cache[norm] = str(row[0])
-        return cache[norm]
+        cache[cache_key] = str(row[0])
+        return cache[cache_key]
+
     pid = str(uuid.uuid4())
     cur.execute(
         "INSERT INTO people (id, canonical_name, birth_date, gender) "
         "VALUES (%s, %s, %s, %s)",
         (pid, norm, birth_date, gender),
     )
-    cache[norm] = pid
+    cache[cache_key] = pid
     return pid
 
 

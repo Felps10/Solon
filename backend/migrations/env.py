@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from app.database import Base
 from app.models import (
     Party, Office, Election,
-    Person, PartyAffiliation, Mandate, Candidacy,
+    Person, PersonExternalId, PartyAffiliation, Mandate, Candidacy,
     InstitutionalContext,
 )
 from app.settings import settings
@@ -58,7 +58,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = settings.database_url.replace("+asyncpg", "+psycopg2")
+    url = settings.database_url.replace("+asyncpg", "+psycopg2").replace("ssl=require", "sslmode=require")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -81,7 +81,7 @@ def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section, {})
     configuration["sqlalchemy.url"] = settings.database_url.replace(
         "+asyncpg", "+psycopg2"
-    )
+    ).replace("ssl=require", "sslmode=require")
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
