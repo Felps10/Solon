@@ -76,21 +76,38 @@ CDN_URL = (
 
 # DS_SIT_TOT_TURNO → Candidacy.result
 RESULT_MAP = {
-    "ELEITO": "elected",
-    "ELEITO POR QP": "elected",
-    "ELEITO POR MÉDIA": "elected",
-    "MÉDIA": "elected",
-    "NÃO ELEITO": "defeated",
+    # --- Elected ---
+    "ELEITO":               "elected",
+    "ELEITO POR QP":        "elected",
+    "ELEITO POR MÉDIA":     "elected",
+    "MÉDIA":                "elected",
+    # --- Not elected ---
+    "NÃO ELEITO":           "defeated",
     "NÃO ELEITO POR MÉDIA": "defeated",
-    "SUPLENTE": "defeated",
-    "2º TURNO": "defeated",
-    "RENÚNCIA": "renounced",
-    "RENÚNCIA/FALECIMENTO": "renounced",
-    "CASSADO": "annulled",
-    "CASSADO PELO TSE": "annulled",
-    "CASSADO PELO TRE": "annulled",
-    "ANULADO": "annulled",
-    "INDEFERIDO": "annulled",
+    "SUPLENTE":             "defeated",
+    "2º TURNO":             "defeated",
+    # --- Withdrew or replaced ---
+    "RENÚNCIA":                                       "renounced",
+    "RENÚNCIA/FALECIMENTO":                           "renounced",
+    "RENÚNCIA/FALECIMENTO/CASSAÇÃO ANTES DA ELEIÇÃO": "renounced",
+    "RENÚNCIA/FALECIMENTO/CASSAÇÃO APÓS A ELEIÇÃO":   "renounced",
+    "SUBSTITUÍDO":                                    "renounced",
+    # --- Annulled or denied ---
+    "CASSADO":                          "annulled",
+    "CASSADO PELO TSE":                 "annulled",
+    "CASSADO PELO TRE":                 "annulled",
+    "CASSADO COM RECURSO":              "annulled",
+    "ANULADO":                          "annulled",
+    "INDEFERIDO":                       "annulled",
+    "INDEFERIDO COM RECURSO":           "annulled",
+    "REGISTRO NEGADO ANTES DA ELEIÇÃO": "annulled",
+    "REGISTRO NEGADO APÓS A ELEIÇÃO":   "annulled",
+    # --- TSE null sentinels ---
+    # Explicit entries for readability. The fallback in map_result()
+    # already handles any unmapped value → "unknown", but listing these
+    # makes the intent visible and prevents future confusion.
+    "#NULO#": "unknown",
+    "#NULO":  "unknown",
 }
 
 # DS_CARGO → (institution, level)
