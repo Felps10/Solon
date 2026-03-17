@@ -164,6 +164,7 @@ class Candidacy(Base):
     validity = Column(TSTZRANGE, nullable=True)
     source_label = Column(String(200), nullable=True)
     confidence = Column(String(10), default="high")
+    nome_urna = Column(String(200), nullable=True)
     created_at = Column(DateTime(timezone=True),
                         server_default=func.now())
 

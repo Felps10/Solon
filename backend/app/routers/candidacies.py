@@ -9,12 +9,13 @@ from app.models.person import Person
 from app.models.election import Election
 from app.models.office import Office
 from app.models.party import Party
-from app.schemas.candidacies import CandidacyListResponse, CandidacyDetail
+from app.schemas.candidacies import CandidacyDetail
+from app.schemas.common import PaginatedResponse
 
 router = APIRouter(prefix="/candidacies", tags=["candidacies"])
 
 
-@router.get("", response_model=CandidacyListResponse)
+@router.get("", response_model=PaginatedResponse[CandidacyDetail])
 async def list_candidacies(
     year:      int | None = Query(default=None),
     office:    str | None = Query(default=None,
@@ -28,7 +29,7 @@ async def list_candidacies(
     limit:     int        = Query(default=50, ge=1, le=200),
     offset:    int        = Query(default=0,  ge=0),
     db: AsyncSession      = Depends(get_db),
-) -> CandidacyListResponse:
+) -> PaginatedResponse[CandidacyDetail]:
 
     base = (
         select(
@@ -43,6 +44,7 @@ async def list_candidacies(
             Candidacy.vote_count,
             Candidacy.confidence,
             Candidacy.source_label,
+            Candidacy.nome_urna,
         )
         .join(Person,    Person.id    == Candidacy.person_id)
         .join(Election,  Election.id  == Candidacy.election_id)
@@ -72,7 +74,12 @@ async def list_candidacies(
     )
     rows = (await db.execute(rows_stmt)).mappings().all()
 
-    return CandidacyListResponse(
+    page = (offset // limit) + 1 if limit > 0 else 1
+
+    return PaginatedResponse[CandidacyDetail](
         total=total,
+        page=page,
+        page_size=limit,
+        has_next=(offset + limit) < total,
         items=[CandidacyDetail(**r) for r in rows],
     )

@@ -8,8 +8,3 @@ class CandidacyDetail(CandidacySummary):
     person_id:    uuid.UUID
     person_name:  str
     source_label: str | None
-
-
-class CandidacyListResponse(BaseModel):
-    total: int
-    items: list[CandidacyDetail]

@@ -187,6 +187,11 @@ class SearchService:
                         immutable_unaccent(:tsquery))
                     OR immutable_unaccent(canonical_name)
                         ILIKE '%' || immutable_unaccent(:q) || '%'
+                    OR id IN (
+                        SELECT person_id FROM candidacies
+                        WHERE search_vector @@ to_tsquery('portuguese',
+                            immutable_unaccent(:tsquery))
+                    )
                 ORDER BY rank DESC
                 LIMIT :limit OFFSET :offset
             )
@@ -255,6 +260,11 @@ class SearchService:
                             immutable_unaccent(:tsquery))
                         OR immutable_unaccent(canonical_name)
                             ILIKE '%' || immutable_unaccent(:q) || '%'
+                        OR id IN (
+                            SELECT person_id FROM candidacies
+                            WHERE search_vector @@ to_tsquery('portuguese',
+                                immutable_unaccent(:tsquery))
+                        )
                 ) AS candidacies
         """)
         row = (

@@ -25,6 +25,7 @@ class CandidacySummary(BaseModel):
     result:        str | None
     vote_count:    int | None
     confidence:    str
+    nome_urna:     str | None
 
 
 class MandateSummary(BaseModel):

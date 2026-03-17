@@ -8,6 +8,7 @@ import uuid
 
 from app.database import get_db
 from app.models.person import Person, Candidacy, Mandate
+from app.schemas.common import PaginatedResponse
 from app.schemas.people import (
     PersonSummary, PersonProfile,
     ExternalId, CandidacySummary, MandateSummary,
@@ -18,24 +19,42 @@ router = APIRouter(prefix="/people", tags=["people"])
 
 # ── GET /api/v1/people/search ────────────────────────────────────────
 
-@router.get("/search", response_model=list[PersonSummary])
+@router.get("/search", response_model=PaginatedResponse[PersonSummary])
 async def search_people(
-    q:     str = Query(..., min_length=2),
-    limit: int = Query(default=20, ge=1, le=100),
+    q:         str = Query(..., min_length=2),
+    page:      int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-) -> list[PersonSummary]:
+) -> PaginatedResponse[PersonSummary]:
+    offset = (page - 1) * page_size
+
+    count_stmt = text("""
+        SELECT count(*)
+        FROM people
+        WHERE immutable_unaccent(canonical_name)
+            ILIKE '%' || immutable_unaccent(:q) || '%'
+    """)
+    total = (await db.execute(count_stmt, {"q": q})).scalar_one()
+
     stmt = text("""
         SELECT id, canonical_name, birth_date, gender
         FROM people
         WHERE immutable_unaccent(canonical_name)
             ILIKE '%' || immutable_unaccent(:q) || '%'
         ORDER BY canonical_name
-        LIMIT :limit
+        LIMIT :limit OFFSET :offset
     """)
     rows = (
-        await db.execute(stmt, {"q": q, "limit": limit})
+        await db.execute(stmt, {"q": q, "limit": page_size, "offset": offset})
     ).mappings().all()
-    return [PersonSummary(**r) for r in rows]
+
+    return PaginatedResponse[PersonSummary](
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_next=(offset + page_size) < total,
+        items=[PersonSummary(**r) for r in rows],
+    )
 
 
 # ── GET /api/v1/people/{person_id} ───────────────────────────────────
@@ -86,6 +105,7 @@ async def get_person(
                 result=c.result,
                 vote_count=c.vote_count,
                 confidence=c.confidence,
+                nome_urna=c.nome_urna,
             )
             for c in sorted(
                 person.candidacies,
@@ -146,7 +166,8 @@ async def get_snapshot(
             c.territory,
             c.result,
             c.vote_count,
-            c.confidence
+            c.confidence,
+            c.nome_urna
         FROM candidacies c
         JOIN elections e  ON e.id = c.election_id
         JOIN offices   o  ON o.id = c.office_id

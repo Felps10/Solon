@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Optional
 
 import psycopg2
+import psycopg2.extras
 import requests
 from tqdm import tqdm
 import pandas as pd
@@ -115,7 +116,11 @@ HIDDEN_VALUES = {"NÃO DIVULGÁVEL", "#NULO", "-1", "-4", "nan", "NaN", ""}
 
 def get_connection():
     """Synchronous psycopg2 connection derived from settings.DATABASE_URL."""
-    url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+    url = (
+        settings.database_url
+        .replace("postgresql+asyncpg://", "postgresql://")
+        .replace("ssl=require", "sslmode=require")
+    )
     return psycopg2.connect(url)
 
 
@@ -325,6 +330,7 @@ def ingest_year(year: int) -> dict:
 
     conn = get_connection()
     BATCH = 500
+    nome_urna_updates: list = []  # (nome_urna_val, candidacy_label) pairs
 
     try:
         cur = conn.cursor()
@@ -343,8 +349,12 @@ def ingest_year(year: int) -> dict:
         for _, row in tqdm(df.iterrows(), total=total_rows, desc=f"{year}", unit="row"):
             sq = clean(str(row.get("SQ_CANDIDATO", "")))
             candidacy_label = f"{source_prefix}/{sq}"
+            nome_urna_val = clean(str(row.get("NM_URNA_CANDIDATO", ""))) or None
 
             if candidacy_label in existing_labels:
+                # Queue the nome_urna update; flush in batches below.
+                if nome_urna_val:
+                    nome_urna_updates.append((candidacy_label, nome_urna_val))
                 stats["skipped_candidacies"] += 1
                 continue
 
@@ -406,8 +416,8 @@ def ingest_year(year: int) -> dict:
             cur.execute(
                 "INSERT INTO candidacies "
                 "(id, person_id, election_id, office_id, party_id, "
-                " territory, result, source_label, confidence) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                " territory, result, source_label, confidence, nome_urna) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     str(uuid.uuid4()),
                     person_id,
@@ -418,6 +428,7 @@ def ingest_year(year: int) -> dict:
                     result,
                     candidacy_label,
                     confidence,
+                    nome_urna_val,
                 ),
             )
             stats["inserted_candidacies"] += 1
@@ -427,6 +438,31 @@ def ingest_year(year: int) -> dict:
             if batch_count >= BATCH:
                 conn.commit()
                 batch_count = 0
+
+        # Flush queued nome_urna updates via a temp table + single JOIN UPDATE.
+        # This avoids repeated full-table scans when source_label lacks an index.
+        if nome_urna_updates:
+            cur.execute("""
+                CREATE TEMP TABLE _nome_urna_updates (
+                    source_label TEXT,
+                    nome_urna    TEXT
+                ) ON COMMIT DROP
+            """)
+            psycopg2.extras.execute_values(
+                cur,
+                "INSERT INTO _nome_urna_updates (source_label, nome_urna) VALUES %s",
+                nome_urna_updates,
+                page_size=1000,
+            )
+            cur.execute("""
+                UPDATE candidacies c
+                   SET nome_urna = u.nome_urna
+                  FROM _nome_urna_updates u
+                 WHERE c.source_label = u.source_label
+                   AND c.nome_urna IS DISTINCT FROM u.nome_urna
+            """)
+            updated = cur.rowcount
+            log.info(f"[{year}] nome_urna backfill: {updated:,} rows updated ({len(nome_urna_updates):,} queued)")
 
         conn.commit()
         cur.close()
