@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from sqlalchemy.orm import selectinload
-from datetime import datetime
+from datetime import date, datetime, time, timezone
+from typing import Optional
 import uuid
 
 from app.database import get_db
@@ -62,8 +63,14 @@ async def search_people(
 @router.get("/{person_id}", response_model=PersonProfile)
 async def get_person(
     person_id: uuid.UUID,
+    as_of: Optional[date] = Query(
+        None,
+        description="Return profile state as of this date (YYYY-MM-DD). "
+                    "Filters mandates by validity. Candidacies always return all.",
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> PersonProfile:
+    # Load person + candidacies (always all — candidacies not filtered by as_of)
     stmt = (
         select(Person)
         .where(Person.id == person_id)
@@ -75,14 +82,45 @@ async def get_person(
                 .selectinload(Candidacy.office),
             selectinload(Person.candidacies)
                 .selectinload(Candidacy.party),
-            selectinload(Person.mandates)
-                .selectinload(Mandate.office),
         )
     )
     result = await db.execute(stmt)
     person = result.scalar_one_or_none()
     if person is None:
         raise HTTPException(status_code=404, detail="Person not found")
+
+    # Load mandates — filter by validity when as_of is provided
+    _MAND_SQL = """
+        SELECT
+            m.id,
+            o.name  AS office_name,
+            m.territory,
+            lower(m.validity) AS validity_lower,
+            upper(m.validity) AS validity_upper,
+            m.interrupted,
+            m.interruption_reason,
+            m.confidence
+        FROM mandates m
+        JOIN offices o ON o.id = m.office_id
+        WHERE m.person_id = :pid
+        {where_extra}
+        ORDER BY lower(m.validity) DESC
+    """
+    if as_of:
+        ts = datetime.combine(as_of, time(0, 0, 0)).replace(tzinfo=timezone.utc)
+        mand_rows = (
+            await db.execute(
+                text(_MAND_SQL.format(where_extra="AND m.validity @> CAST(:ts AS timestamptz)")),
+                {"pid": str(person_id), "ts": ts},
+            )
+        ).mappings().all()
+    else:
+        mand_rows = (
+            await db.execute(
+                text(_MAND_SQL.format(where_extra="")),
+                {"pid": str(person_id)},
+            )
+        ).mappings().all()
 
     return PersonProfile(
         id=person.id,
@@ -91,6 +129,7 @@ async def get_person(
         death_date=person.death_date,
         gender=person.gender,
         bio_summary=person.bio_summary,
+        snapshot_date=as_of,
         external_ids=[
             ExternalId(source=e.source, external_id=e.external_id)
             for e in person.external_ids
@@ -113,19 +152,7 @@ async def get_person(
                 reverse=True,
             )
         ],
-        mandates=[
-            MandateSummary(
-                id=m.id,
-                office_name=m.office.name,
-                territory=m.territory,
-                validity_lower=m.validity.lower if m.validity else None,
-                validity_upper=m.validity.upper if m.validity else None,
-                interrupted=m.interrupted,
-                interruption_reason=m.interruption_reason,
-                confidence=m.confidence,
-            )
-            for m in person.mandates
-        ],
+        mandates=[MandateSummary(**r) for r in mand_rows],
     )
 
 

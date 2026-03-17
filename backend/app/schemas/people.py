@@ -1,6 +1,7 @@
 from __future__ import annotations
 from pydantic import BaseModel
 from datetime import date, datetime
+from typing import Optional
 import uuid
 
 
@@ -49,3 +50,4 @@ class PersonProfile(BaseModel):
     external_ids:   list[ExternalId]
     candidacies:    list[CandidacySummary]
     mandates:       list[MandateSummary]
+    snapshot_date:  Optional[date] = None
