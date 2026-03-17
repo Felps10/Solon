@@ -66,7 +66,7 @@ export const RESULT_DISPLAY: Record<CandidacyResult, ResultDisplay> = {
     colorClass: 'bg-teal-900/40 text-teal-300',
   },
   defeated: {
-    label:      'Não eleito',
+    label:      'Derrotado',
     colorClass: 'bg-white/5 text-white/40',
   },
   annulled: {
