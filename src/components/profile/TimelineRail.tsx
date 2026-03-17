@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef } from 'react'
 import type { CandidacySummary } from '@/types/api'
 import { getPartyColor } from '@/lib/utils'
+import { getResultDisplay } from '@/lib/constants'
 
 interface TimelineRailProps {
   candidacies: CandidacySummary[]
@@ -170,24 +171,17 @@ export default function TimelineRail({ candidacies, activeYear, personId }: Time
                   )}
 
                   {/* Result badge */}
-                  <span
-                    className="px-1.5 py-px rounded"
-                    style={{
-                      fontSize:   '0.6rem',
-                      background: node.elected
-                        ? 'rgba(45, 212, 191, 0.15)'
-                        : 'rgba(255, 255, 255, 0.07)',
-                      color: node.elected
-                        ? 'rgb(45, 212, 191)'
-                        : 'var(--color-muted)',
-                    }}
-                  >
-                    {node.elected
-                      ? 'Eleito'
-                      : node.result === 'defeated'
-                        ? 'Derrota'
-                        : '—'}
-                  </span>
+                  {(() => {
+                    const { label, colorClass } = getResultDisplay(node.result)
+                    return (
+                      <span
+                        className={`px-1.5 py-px rounded ${colorClass}`}
+                        style={{ fontSize: '0.6rem' }}
+                      >
+                        {label}
+                      </span>
+                    )
+                  })()}
                 </button>
               </div>
             )

@@ -4,7 +4,8 @@ import type { CandidacySummary } from '@/types/api'
 import DataTable, { type Column } from '@/components/ui/DataTable'
 import ConfidenceBadge from '@/components/ui/ConfidenceBadge'
 import NullState from '@/components/ui/NullState'
-import { TABLE_HEADERS, RESULT_LABELS, NULL_LABELS, PROFILE } from '@/lib/constants'
+import { TABLE_HEADERS, NULL_LABELS, PROFILE } from '@/lib/constants'
+import ResultBadge from '@/components/ui/ResultBadge'
 import { formatVotes } from '@/lib/utils'
 
 interface ElectoralTableProps {
@@ -49,7 +50,7 @@ const columns: Column<CandidacySummary>[] = [
     key: 'result',
     header: TABLE_HEADERS.result,
     render: (row) =>
-      row.result ? (RESULT_LABELS[row.result] ?? row.result) : <NullState label={NULL_LABELS.result} />,
+      row.result ? <ResultBadge result={row.result} /> : <NullState label={NULL_LABELS.result} />,
   },
   {
     key: 'vote_count',
