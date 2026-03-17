@@ -19,6 +19,14 @@ app.add_middleware(
 from app.api.people import router as people_router
 app.include_router(people_router)
 
+from app.routers import search as search_router
+from app.routers import people as people_v1_router
+from app.routers import candidacies as candidacies_router
+
+app.include_router(search_router.router,       prefix="/api/v1")
+app.include_router(people_v1_router.router,    prefix="/api/v1")
+app.include_router(candidacies_router.router,  prefix="/api/v1")
+
 
 @app.get("/")
 async def root():

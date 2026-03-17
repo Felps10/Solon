@@ -1,13 +1,20 @@
+from __future__ import annotations
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import (
     Column, String, Date, Text,
     DateTime, Boolean, ForeignKey, Integer, UniqueConstraint, Index
 )
-from sqlalchemy.dialects.postgresql import UUID, TSTZRANGE
+from sqlalchemy.dialects.postgresql import UUID, TSTZRANGE, TSVECTOR
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.office import Office
+    from app.models.election import Election
+    from app.models.party import Party
 
 
 class Person(Base):
@@ -26,9 +33,20 @@ class Person(Base):
                         server_default=func.now())
     updated_at = Column(DateTime(timezone=True),
                         onupdate=func.now())
+    search_vector: Mapped[str | None] = mapped_column(
+        TSVECTOR, nullable=True, index=False
+    )
 
     external_ids: Mapped[list["PersonExternalId"]] = relationship(
         "PersonExternalId", back_populates="person",
+        cascade="all, delete-orphan"
+    )
+    candidacies: Mapped[list["Candidacy"]] = relationship(
+        "Candidacy", back_populates="person",
+        cascade="all, delete-orphan"
+    )
+    mandates: Mapped[list["Mandate"]] = relationship(
+        "Mandate", back_populates="person",
         cascade="all, delete-orphan"
     )
 
@@ -119,6 +137,9 @@ class Mandate(Base):
     created_at = Column(DateTime(timezone=True),
                         server_default=func.now())
 
+    person: Mapped["Person"] = relationship("Person", back_populates="mandates")
+    office: Mapped["Office"] = relationship("Office", foreign_keys=[office_id])
+
 
 class Candidacy(Base):
     __tablename__ = "candidacies"
@@ -145,3 +166,8 @@ class Candidacy(Base):
     confidence = Column(String(10), default="high")
     created_at = Column(DateTime(timezone=True),
                         server_default=func.now())
+
+    person: Mapped["Person"] = relationship("Person", back_populates="candidacies")
+    election: Mapped["Election"] = relationship("Election", foreign_keys=[election_id])
+    office: Mapped["Office"] = relationship("Office", foreign_keys=[office_id])
+    party: Mapped["Party"] = relationship("Party", foreign_keys=[party_id])
