@@ -61,7 +61,7 @@ export default async function PessoaPage({ params, searchParams }: PageProps) {
         {PROFILE.back_to_search}
       </Link>
 
-      <IdentityHeader person={person} />
+      <IdentityHeader person={person} candidacies={person.candidacies} />
 
       <div className="mt-8 flex flex-col lg:flex-row gap-10">
         <div className="flex-1 min-w-0">
