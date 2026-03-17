@@ -81,19 +81,46 @@ class SearchService:
     ) -> list[PersonHit]:
         stmt = text("""
             SELECT
-                id,
-                canonical_name,
-                birth_date,
-                gender,
-                ts_rank(
-                    search_vector,
-                    to_tsquery('portuguese', immutable_unaccent(:tsquery))
-                ) AS rank
+                people.id,
+                people.canonical_name,
+                people.birth_date,
+                people.gender,
+                (
+                    ts_rank(
+                        people.search_vector,
+                        to_tsquery('portuguese', immutable_unaccent(:tsquery))
+                    )
+                    + CASE WHEN EXISTS (
+                        SELECT 1 FROM candidacies c
+                        WHERE c.person_id = people.id
+                          AND LOWER(c.nome_urna) = LOWER(:q)
+                    ) THEN 1.0 ELSE 0.0 END
+                    + CASE WHEN LOWER(people.canonical_name) LIKE LOWER(:q) || '%'
+                      THEN 0.5 ELSE 0.0 END
+                ) AS rank,
+                last_c.last_party_abbr,
+                last_c.last_office_name,
+                last_c.last_election_year,
+                last_c.nome_urna
             FROM people
+            LEFT JOIN LATERAL (
+                SELECT
+                    par.abbreviation AS last_party_abbr,
+                    off.name         AS last_office_name,
+                    el.year          AS last_election_year,
+                    c2.nome_urna     AS nome_urna
+                FROM candidacies c2
+                JOIN elections  el  ON el.id  = c2.election_id
+                JOIN offices    off ON off.id  = c2.office_id
+                LEFT JOIN parties par ON par.id = c2.party_id
+                WHERE c2.person_id = people.id
+                ORDER BY el.year DESC
+                LIMIT 1
+            ) last_c ON true
             WHERE
-                search_vector @@ to_tsquery('portuguese',
+                people.search_vector @@ to_tsquery('portuguese',
                     immutable_unaccent(:tsquery))
-                OR immutable_unaccent(canonical_name)
+                OR immutable_unaccent(people.canonical_name)
                     ILIKE '%' || immutable_unaccent(:q) || '%'
             ORDER BY rank DESC
             LIMIT :limit OFFSET :offset

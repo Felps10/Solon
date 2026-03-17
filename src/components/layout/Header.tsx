@@ -1,28 +1,37 @@
 import Link from 'next/link'
+import { NAV } from '@/lib/constants'
 
 export default function Header() {
   return (
-    <header className="bg-[#0f1923] text-white border-b border-white/10">
-      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <header
+      className="sticky top-0 z-40 border-b"
+      style={{
+        background: 'var(--color-surface)',
+        borderColor: 'var(--color-rule)',
+      }}
+    >
+      <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
         <Link
           href="/"
-          className="text-xl font-semibold tracking-tight hover:text-white/80 transition-colors"
-          style={{ fontFamily: 'var(--font-lora)' }}
+          className="text-xl font-semibold tracking-tight transition-opacity hover:opacity-70"
+          style={{ fontFamily: 'var(--font-display)', color: 'var(--color-ink)' }}
         >
           Sólon
         </Link>
         <nav className="flex items-center gap-8">
           <Link
-            href="/search"
-            className="text-sm text-white/70 hover:text-white transition-colors"
+            href="/"
+            className="text-sm transition-colors"
+            style={{ color: 'var(--color-muted)' }}
           >
-            Buscar
+            {NAV.search}
           </Link>
           <Link
-            href="/about"
-            className="text-sm text-white/70 hover:text-white transition-colors"
+            href="/sobre"
+            className="text-sm transition-colors"
+            style={{ color: 'var(--color-muted)' }}
           >
-            Sobre
+            {NAV.about}
           </Link>
         </nav>
       </div>

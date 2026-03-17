@@ -8,12 +8,16 @@ from app.schemas.common import PageMeta
 
 
 class PersonHit(BaseModel):
-    kind:           Literal["person"]
-    id:             uuid.UUID
-    canonical_name: str
-    birth_date:     date | None
-    gender:         str | None
-    rank:           float
+    kind:               Literal["person"]
+    id:                 uuid.UUID
+    canonical_name:     str
+    birth_date:         date | None
+    gender:             str | None
+    rank:               float
+    last_party_abbr:    str | None = None
+    last_office_name:   str | None = None
+    last_election_year: int | None = None
+    nome_urna:          str | None = None
 
 
 class PartyHit(BaseModel):

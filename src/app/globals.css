@@ -1,20 +1,68 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: var(--font-lora);
-  --font-body: var(--font-inter);
-  --color-brand-dark: #0f1923;
-  --color-brand-text: #f5f0e8;
-  --color-brand-muted: #8b9aaa;
+  /* Typography */
+  --font-display: var(--font-syne);
+  --font-body: var(--font-ibm-plex-sans);
+  --font-mono: var(--font-ibm-plex-mono);
+
+  /* Colors — light analytical theme */
+  --color-ink: #0F0F0F;
+  --color-paper: #F5F4F0;
+  --color-rule: #E0DDD6;
+  --color-muted: #8C8A84;
+  --color-accent: #1C4ED8;
+  --color-accent-hover: #1E40AF;
+  --color-surface: #FFFFFF;
+
+  /* Confidence */
+  --color-confidence-high: #16A34A;
+  --color-confidence-high-bg: #DCFCE7;
+  --color-confidence-medium: #D97706;
+  --color-confidence-medium-bg: #FEF3C7;
+  --color-confidence-low: #DC2626;
+  --color-confidence-low-bg: #FEE2E2;
+
+  /* Party colors */
+  --color-party-pt: #CC0000;
+  --color-party-psdb: #1E90FF;
+  --color-party-pl: #003B8F;
+  --color-party-pp: #1E4D92;
+  --color-party-mdb: #00963F;
+  --color-party-psd: #2D6CC0;
+  --color-party-republicans: #005CA9;
+  --color-party-union: #003B8F;
+  --color-party-default: #6B7280;
+
+  /* Font size scale — analytical */
+  --text-2xs: 0.625rem;   /* 10px */
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.875rem;    /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-lg: 1.125rem;    /* 18px */
+  --text-xl: 1.25rem;     /* 20px */
+  --text-2xl: 1.5rem;     /* 24px */
+  --text-3xl: 1.875rem;   /* 30px */
+  --text-4xl: 2.375rem;   /* 38px */
 }
 
 :root {
-  --background: #0f1923;
-  --foreground: #f5f0e8;
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: var(--text-base);
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display), system-ui, sans-serif;
+}
+
+code, kbd, pre {
+  font-family: var(--font-mono), monospace;
 }

@@ -22,6 +22,9 @@ tables:
 shell:
 	psql -U mpb_user -d memoria_politica
 
+neon-shell:
+	psql "$$(grep NEON_DATABASE_URL backend/.env | cut -d '=' -f2-)"
+
 db-dump:
 	mkdir -p backups
 	pg_dump -U mpb_user -Fc memoria_politica \
