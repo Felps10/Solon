@@ -236,6 +236,57 @@ def get_or_create_election(cur, cache: dict, year: int, cd_eleicao: str,
     return eid
 
 
+def get_or_create_territory(cur, cache: dict, nm_ue: str) -> Optional[str]:
+    nm_ue = clean(nm_ue)
+    if not nm_ue:
+        return None
+
+    cache_key = nm_ue.upper()
+    if cache_key in cache:
+        return cache[cache_key]
+
+    # Lookup using immutable_unaccent on both sides
+    cur.execute(
+        "SELECT id FROM territories "
+        "WHERE public.immutable_unaccent(upper(tse_ue_name)) "
+        "    = public.immutable_unaccent(upper(%s)) "
+        "LIMIT 1",
+        (nm_ue,),
+    )
+    row = cur.fetchone()
+    if row:
+        cache[cache_key] = str(row[0])
+        return cache[cache_key]
+
+    # Not found — insert as municipality (new TSE string not seen before)
+    import uuid as _uuid
+    tid = str(_uuid.uuid4())
+    cur.execute(
+        "INSERT INTO territories "
+        "  (id, name, territory_type, tse_ue_name) "
+        "VALUES (%s, %s, 'municipality', %s) "
+        "ON CONFLICT (name, territory_type) DO NOTHING "
+        "RETURNING id",
+        (tid, nm_ue.title(), nm_ue.upper()),
+    )
+    result = cur.fetchone()
+    if result:
+        cache[cache_key] = str(result[0])
+    else:
+        # Conflict — fetch the existing row
+        cur.execute(
+            "SELECT id FROM territories "
+            "WHERE public.immutable_unaccent(upper(tse_ue_name)) "
+            "    = public.immutable_unaccent(upper(%s)) "
+            "LIMIT 1",
+            (nm_ue,),
+        )
+        existing = cur.fetchone()
+        cache[cache_key] = str(existing[0]) if existing else None
+
+    return cache[cache_key]
+
+
 def get_or_create_person(cur, cache: dict, nm_candidato: str,
                           birth_date: Optional[str], gender: Optional[str]) -> Optional[str]:
     norm = normalize_name(nm_candidato)
@@ -336,6 +387,7 @@ def ingest_year(year: int) -> dict:
         "inserted_parties": 0,
         "inserted_offices": 0,
         "inserted_elections": 0,
+        "inserted_territories": 0,
         "inserted_candidacies": 0,
         "skipped_candidacies": 0,
     }
@@ -344,6 +396,7 @@ def ingest_year(year: int) -> dict:
     office_cache: dict = {}
     election_cache: dict = {}
     person_cache: dict = {}
+    territory_cache: dict = {}
 
     conn = get_connection()
     BATCH = 500
@@ -426,6 +479,14 @@ def ingest_year(year: int) -> dict:
                 stats["skipped_candidacies"] += 1
                 continue
 
+            # Territory
+            territory_before = len(territory_cache)
+            territory_id = get_or_create_territory(
+                cur, territory_cache, row.get("NM_UE", "")
+            )
+            if len(territory_cache) > territory_before:
+                stats["inserted_territories"] += 1
+
             # Candidacy
             territory = clean(str(row.get("NM_UE", "")))
             result = map_result(row.get("DS_SIT_TOT_TURNO", ""))
@@ -433,8 +494,8 @@ def ingest_year(year: int) -> dict:
             cur.execute(
                 "INSERT INTO candidacies "
                 "(id, person_id, election_id, office_id, party_id, "
-                " territory, result, source_label, confidence, nome_urna) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                " territory, territory_id, result, source_label, confidence, nome_urna) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     str(uuid.uuid4()),
                     person_id,
@@ -442,6 +503,7 @@ def ingest_year(year: int) -> dict:
                     office_id,
                     party_id,
                     territory,
+                    territory_id,
                     result,
                     candidacy_label,
                     confidence,
@@ -512,6 +574,7 @@ def main():
     total_parties = 0
     total_offices = 0
     total_elections = 0
+    total_territories = 0
     total_candidacies = 0
 
     for year in years:
@@ -525,13 +588,15 @@ def main():
             total_parties += stats["inserted_parties"]
             total_offices += stats["inserted_offices"]
             total_elections += stats["inserted_elections"]
+            total_territories += stats["inserted_territories"]
             total_candidacies += stats["inserted_candidacies"]
             log.info(
                 f"[{year}] Done — "
                 f"{stats['inserted_candidacies']:,} candidacies inserted, "
                 f"{stats['skipped_candidacies']:,} skipped, "
                 f"{stats['inserted_people']:,} new people, "
-                f"{stats['inserted_parties']:,} new parties"
+                f"{stats['inserted_parties']:,} new parties, "
+                f"{stats['inserted_territories']:,} new territories"
             )
         except Exception as e:
             log.error(f"[{year}] FAILED: {e}")
@@ -541,11 +606,12 @@ def main():
     print("INGESTION SUMMARY")
     print("=" * 60)
     print(f"  Years processed : {len([s for s in summary if s['status'] == 'ok'])}/{len(years)}")
-    print(f"  People inserted : {total_people:,}")
-    print(f"  Parties inserted: {total_parties:,}")
-    print(f"  Offices inserted: {total_offices:,}")
-    print(f"  Elections inserted: {total_elections:,}")
-    print(f"  Candidacies inserted: {total_candidacies:,}")
+    print(f"  People inserted      : {total_people:,}")
+    print(f"  Parties inserted     : {total_parties:,}")
+    print(f"  Offices inserted     : {total_offices:,}")
+    print(f"  Elections inserted   : {total_elections:,}")
+    print(f"  Territories inserted : {total_territories:,}")
+    print(f"  Candidacies inserted : {total_candidacies:,}")
 
     failures = [s for s in summary if s["status"] == "error"]
     if failures:
