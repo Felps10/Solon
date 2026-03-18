@@ -3,6 +3,7 @@ from app.models.office import Office
 from app.models.election import Election
 from app.models.person import Person, PersonExternalId, PartyAffiliation, Mandate, Candidacy
 from app.models.context import InstitutionalContext
+from app.models.territory import Territory
 
 __all__ = [
     "Party",
@@ -14,4 +15,5 @@ __all__ = [
     "Mandate",
     "Candidacy",
     "InstitutionalContext",
+    "Territory",
 ]

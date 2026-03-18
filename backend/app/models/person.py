@@ -126,6 +126,10 @@ class Mandate(Base):
                        ForeignKey("offices.id"),
                        nullable=True)
     territory = Column(String(200), nullable=True)
+    territory_id = Column(UUID(as_uuid=True),
+                          ForeignKey("territories.id"),
+                          nullable=True,
+                          index=True)
     validity = Column(TSTZRANGE, nullable=False)
     date_precision = Column(String(20), default="year")
     is_approximate = Column(Boolean, default=False)
@@ -159,6 +163,10 @@ class Candidacy(Base):
                       ForeignKey("parties.id"),
                       nullable=True)
     territory = Column(String(200), nullable=True)
+    territory_id = Column(UUID(as_uuid=True),
+                          ForeignKey("territories.id"),
+                          nullable=True,
+                          index=True)
     result = Column(String(30), nullable=True)
     vote_count = Column(Integer, nullable=True)
     validity = Column(TSTZRANGE, nullable=True)
